@@ -1,0 +1,97 @@
+/* ── Roles ─────────────────────────────────────────────── */
+.role-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  width: 100%;
+  margin-bottom: 16px;
+}
+.role-btn {
+  padding: 12px 10px;
+  border: 1.5px solid var(--gray-mid);
+  border-radius: 10px;
+  background: var(--gray-lt);
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-sec);
+  text-align: center;
+  transition: var(--tr);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+.role-btn i          { font-size: 22px; }
+.role-btn .role-name { font-size: 13px; font-weight: 700; color: var(--text); }
+.role-btn .role-desc { font-size: 10px; opacity: .6; }
+.role-btn:hover      { border-color: var(--teal); color: var(--teal); background: var(--teal-bg); }
+.role-btn.selected   { border-color: var(--teal); background: var(--teal); color: #fff; }
+.role-btn.selected .role-name { color: #fff; }
+.role-btn.full       { grid-column: 1 / -1; flex-direction: row; gap: 12px; padding: 10px 16px; }
+.role-btn.full i     { font-size: 18px; }
+
+.divider {
+  grid-column: 1 / -1;
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-sec);
+  margin: 4px 0;
+  position: relative;
+}
+.divider::before, .divider::after {
+  content: ''; position: absolute; top: 50%;
+  width: 38%; height: 1px; background: var(--gray-mid);
+}
+.divider::before { left: 0; }
+.divider::after  { right: 0; }
+
+/* ── Campo contraseña con ojo ───────────────────────────── */
+.password-wrapper {
+  position: relative;
+  width: 100%;
+  margin-top: 10px;
+}
+.password-wrapper .input-group {
+  margin-bottom: 0;
+}
+.password-wrapper .input-group input {
+  padding-right: 44px;
+}
+.toggle-pass {
+  position: absolute;
+  right: 0;
+  top: 0;
+  height: 44px;         /* igual que el input */
+  width: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-sec);
+  font-size: 17px;
+  transition: var(--tr);
+  z-index: 5;
+}
+.toggle-pass:hover { color: var(--teal); }
+.toggle-pass i { pointer-events: none; }
+
+/* ── Aviso sesión expirada ──────────────────────────────── */
+.session-msg {
+  width: 100%;
+  padding: 9px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  margin-bottom: 12px;
+  display: none;
+  align-items: center;
+  gap: 7px;
+  background: #fff3cd;
+  color: #7a5a00;
+  border: 1px solid #ffe082;
+}
+.session-msg.show { display: flex; }

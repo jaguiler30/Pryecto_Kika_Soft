@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Crear Usuario</title>
+  <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../../css/kika.css">
+</head>
+<body class="page-user-form">
+
+<div class="user-card">
+  <div class="user-card-header">
+    <i class="ri-user-add-line" style="font-size:18px"></i>
+    Crear Usuario
+  </div>
+
+  <div class="user-card-body">
+    <form id="frmCrear" novalidate>
+
+      <div class="input-group" style="margin-bottom:14px">
+        <div class="field-label">Nombre completo *</div>
+        <input class="field-input" id="nombre" type="text" placeholder="ej. Juan Pérez">
+        <div class="field-error" id="err-nombre"></div>
+      </div>
+
+      <div class="input-group" style="margin-bottom:14px">
+        <div class="field-label">Correo electrónico *</div>
+        <input class="field-input" id="email" type="email" placeholder="correo@empresa.com">
+        <div class="field-error" id="err-email"></div>
+      </div>
+
+      <!-- Roles alineados con la tabla ROL de la BD -->
+      <div class="input-group" style="margin-bottom:14px">
+        <div class="field-label">Rol *</div>
+        <select class="field-input" id="rol">
+          <option value="" disabled selected>Seleccionar rol</option>
+          <option value="1">Materia Prima</option>
+          <option value="2">Costeo</option>
+          <option value="3">Consulta</option>
+          <option value="4">Administrador</option>
+        </select>
+        <div class="field-error" id="err-rol"></div>
+      </div>
+
+      <div class="input-group" style="margin-bottom:14px">
+        <div class="field-label">Contraseña *</div>
+        <input class="field-input" id="contrasena" type="password" placeholder="Mínimo 8 caracteres">
+        <div class="field-error" id="err-contrasena"></div>
+      </div>
+
+      <div class="input-group" style="margin-bottom:14px">
+        <div class="field-label">Confirmar contraseña *</div>
+        <input class="field-input" id="confirmar" type="password" placeholder="Repite la contraseña">
+        <div class="field-error" id="err-confirmar"></div>
+      </div>
+
+      <div id="errGlobal" style="font-size:11px;color:var(--red);min-height:14px;margin-bottom:8px"></div>
+
+      <div class="form-actions" style="border-top:1px solid var(--gray-mid);padding-top:16px;margin-top:4px">
+        <button type="button" class="btn btn-cancel" onclick="limpiarForm()">
+          <i class="ri-close-line"></i> Limpiar
+        </button>
+        <button type="submit" class="btn btn-secondary" id="btnCrear">
+          <i class="ri-user-add-line"></i> Crear usuario
+        </button>
+      </div>
+
+    </form>
+  </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+<script src="../../js/kika.js"></script>
+<script>
+  /* Guard: esta página solo puede abrirse desde el shell (con token en parent).
+     Si alguien accede directamente sin sesión, lo manda al login. */
+  requireAuth([4]);
+
+  /* ── Limpia el formulario y sus errores ─────── */
+  function limpiarForm() {
+    const form = document.getElementById('frmCrear');
+    form.reset();
+    limpiarErrores(form);
+    document.getElementById('errGlobal').textContent = '';
+  }
+
+  /* ── Envío del formulario ───────────────────── */
+  document.getElementById('frmCrear').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    // Limpiar estado previo
+    limpiarErrores(e.target);
+    document.getElementById('errGlobal').textContent = '';
+
+    const nombre    = document.getElementById('nombre').value.trim();
+    const email     = document.getElementById('email').value.trim();
+    const rol       = document.getElementById('rol').value;
+    const pass      = document.getElementById('contrasena').value;
+    const confirmar = document.getElementById('confirmar').value;
+    let ok = true;
+
+    // Validaciones del lado del cliente
+    if (!nombre)                          { setErr('nombre',    'Ingresa el nombre completo'); ok = false; }
+    if (!email)                           { setErr('email',     'Ingresa el correo'); ok = false; }
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setErr('email', 'Correo inválido'); ok = false; }
+    if (!rol)                             { setErr('rol',       'Selecciona un rol'); ok = false; }
+    if (!pass || pass.length < 8)         { setErr('contrasena','Mínimo 8 caracteres'); ok = false; }
+    if (pass !== confirmar)               { setErr('confirmar', 'Las contraseñas no coinciden'); ok = false; }
+    if (!ok) return;
+
+    // Estado de carga
+    const btn = document.getElementById('btnCrear');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="ri-loader-4-line"></i> Creando...';
+
+    try {
+      const res = await fetch(`${API_URL}/usuarios`, {
+        method: 'POST',
+        headers: {
+          'Content-Type':  'application/json',
+          'Authorization': `Bearer ${getToken()}`
+        },
+        body: JSON.stringify({
+          Nombre:    nombre,
+          Email:     email,
+          ROL_idROL: parseInt(rol),
+          Password:  pass
+        })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        document.getElementById('errGlobal').textContent = data.message || 'Error al crear el usuario';
+        return;
+      }
+
+      toast('Usuario creado correctamente', 'success');
+      setTimeout(() => limpiarForm(), 1500);
+
+    } catch {
+      document.getElementById('errGlobal').textContent = 'No se pudo conectar al servidor';
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="ri-user-add-line"></i> Crear usuario';
+    }
+  });
+</script>
+</body>
+</html>

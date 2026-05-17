@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bloquear / Desbloquear Usuario</title>
+  <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../../css/kika.css">
+</head>
+<body class="page-user-form">
+
+<div class="user-card" style="max-width:520px">
+  <div class="user-card-header">
+    <i class="ri-user-forbid-line" style="font-size:18px"></i>
+    Bloquear / Desbloquear Usuario
+  </div>
+  <div class="user-card-body">
+
+    <!-- Buscador en tiempo real -->
+    <div style="margin-bottom:16px">
+      <div class="field-label">Buscar usuario</div>
+      <div style="display:flex;gap:8px">
+        <input class="field-input" id="buscar" type="text"
+               placeholder="Nombre o correo" style="flex:1" oninput="filtrar()">
+        <button type="button" class="btn btn-cancel" style="height:40px;padding:0 14px"
+                onclick="cargarUsuarios()" title="Recargar lista">
+          <i class="ri-refresh-line"></i>
+        </button>
+      </div>
+    </div>
+
+    <div id="estadoCarga" style="text-align:center;padding:24px;font-size:13px;color:var(--text-sec)">
+      <i class="ri-loader-4-line"></i> Cargando usuarios...
+    </div>
+
+    <div id="listaUsuarios" style="display:none"></div>
+
+  </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+<script src="../../js/kika.js"></script>
+<script>
+  /* Guard: solo admins */
+  requireAuth([4]);
+
+  /** Caché local de usuarios para el filtrado sin llamadas extra */
+  let todosLosUsuarios = [];
+
+  /* ── Carga la lista de usuarios desde la API ── */
+  async function cargarUsuarios() {
+    document.getElementById('estadoCarga').style.display = 'block';
+    document.getElementById('estadoCarga').innerHTML = '<i class="ri-loader-4-line"></i> Cargando...';
+    document.getElementById('listaUsuarios').style.display = 'none';
+
+    try {
+      const res = await fetch(`${API_URL}/usuarios`, {
+        headers: { 'Authorization': `Bearer ${getToken()}` }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+
+      todosLosUsuarios = data.data;
+      renderizar(todosLosUsuarios);
+
+    } catch (err) {
+      document.getElementById('estadoCarga').innerHTML =
+        `<i class="ri-error-warning-line" style="color:var(--red)"></i> Error: ${err.message}`;
+    }
+  }
+
+  /* ── Renderiza el listado de usuarios ────────
+     Aplica estilos según el estado activo/bloqueado */
+  function renderizar(usuarios) {
+    const lista = document.getElementById('listaUsuarios');
+    lista.innerHTML = '';
+
+    if (!usuarios.length) {
+      lista.innerHTML = '<p style="text-align:center;color:var(--text-sec);font-size:13px;padding:16px">No se encontraron usuarios</p>';
+    } else {
+      usuarios.forEach(u => {
+        const activo = u.Activo === 1;
+        const div = document.createElement('div');
+        div.className = 'ticket';
+        div.style.cssText = `display:flex;align-items:center;justify-content:space-between;
+          gap:12px;margin-bottom:8px;${activo ? '' : 'opacity:.65;border-left-color:var(--red)'}`;
+
+        div.innerHTML = `
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:700;font-size:13px">${u.Nombre}</div>
+            <div style="font-size:11px;color:var(--text-sec);margin-top:1px">
+              ${u.Email} · ${ROLES[u.ROL_idROL] || '—'}
+            </div>
+            <div style="font-size:11px;font-weight:600;margin-top:3px;
+              color:${activo ? 'var(--teal)' : 'var(--red)'}">
+              ${activo ? '● Activo' : '● Bloqueado'}
+            </div>
+          </div>
+          <button class="btn ${activo ? 'btn-danger' : 'btn-primary'}"
+            style="padding:6px 14px;font-size:12px;flex-shrink:0;
+              ${activo ? '' : 'background:var(--teal)'}"
+            onclick="toggleBloqueo(${u.idUSUARIO}, ${activo}, this)">
+            <i class="ri-${activo ? 'lock' : 'lock-unlock'}-line"></i>
+            ${activo ? 'Bloquear' : 'Desbloquear'}
+          </button>`;
+
+        lista.appendChild(div);
+      });
+    }
+
+    document.getElementById('estadoCarga').style.display = 'none';
+    lista.style.display = 'block';
+  }
+
+  /* ── Filtra la lista local sin llamar a la API ── */
+  function filtrar() {
+    const val = document.getElementById('buscar').value.trim().toLowerCase();
+    renderizar(!val
+      ? todosLosUsuarios
+      : todosLosUsuarios.filter(u =>
+          u.Nombre.toLowerCase().includes(val) ||
+          u.Email.toLowerCase().includes(val)
+        )
+    );
+  }
+
+  /* ── Bloquea o desbloquea un usuario ─────────
+     Usa confirmar() de kika.js en lugar de confirm() nativo */
+  async function toggleBloqueo(id, estaActivo, btn) {
+    const accion = estaActivo ? 'bloquear' : 'desbloquear';
+    const label  = estaActivo ? 'Bloquear' : 'Desbloquear';
+
+    const ok = await confirmar(
+      `¿Confirmas que deseas <strong>${accion}</strong> a este usuario?`,
+      estaActivo ? 'danger' : 'info',
+      label
+    );
+    if (!ok) return;
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="ri-loader-4-line"></i>';
+
+    try {
+      const res = await fetch(`${API_URL}/usuarios/${id}/${accion}`, {
+        method:  'PUT',
+        headers: { 'Authorization': `Bearer ${getToken()}` }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+
+      toast(
+        `Usuario ${estaActivo ? 'bloqueado' : 'desbloqueado'} correctamente`,
+        estaActivo ? 'error' : 'success'
+      );
+      await cargarUsuarios(); // Recarga la lista actualizada
+
+    } catch (err) {
+      toast('Error: ' + err.message, 'error');
+      btn.disabled = false;
+    }
+  }
+
+  /* Cargar lista al abrir la página */
+  cargarUsuarios();
+</script>
+</body>
+</html>

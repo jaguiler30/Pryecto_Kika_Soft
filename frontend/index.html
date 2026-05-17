@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kika — Acceso</title>
+  <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/kika.css">
+  <link rel="stylesheet" href="css/login.css">
+</head>
+<body class="page-login">
+
+<div class="login-card">
+  <img src="img/LOGO NEGRO.png" alt="Kika" class="logo">
+  <h2>Sistema de Costeo</h2>
+
+  <div class="session-msg" id="sessionMsg">
+    <i class="ri-alert-line"></i>
+    <span id="sessionMsgText"></span>
+  </div>
+
+  <p style="font-size:12px;color:var(--text-sec);text-align:center;margin-bottom:14px">
+    Selecciona tu perfil e ingresa tus credenciales
+  </p>
+
+  <div class="role-grid">
+    <button class="role-btn" data-role="1" onclick="selRole(this)">
+      <i class="ri-box-3-line"></i>
+      <span class="role-name">Materia Prima</span>
+      <span class="role-desc">Telas · Ins. Variables · Ins. Fijos</span>
+    </button>
+    <button class="role-btn" data-role="2" onclick="selRole(this)">
+      <i class="ri-calculator-line"></i>
+      <span class="role-name">Costeo</span>
+      <span class="role-desc">Conformación de precio</span>
+    </button>
+    <button class="role-btn full" data-role="3" onclick="selRole(this)">
+      <i class="ri-bar-chart-line"></i>
+      <span class="role-name">Consulta</span>
+      <span class="role-desc">Ver todos los costos y precios de venta</span>
+    </button>
+    <div class="divider">Otros accesos</div>
+    <button class="role-btn full" data-role="4" onclick="selRole(this)">
+      <i class="ri-shield-user-fill"></i>
+      <span class="role-name">Administrador</span>
+      <span class="role-desc">Usuarios · Soporte · Configuración</span>
+    </button>
+  </div>
+
+  <div id="loginErr" style="font-size:11px;color:var(--red);min-height:14px;margin-bottom:4px;width:100%"></div>
+
+  <form id="loginForm" novalidate style="width:100%">
+
+    <div class="input-group">
+      <i class="ri-mail-line"></i>
+      <input id="email" type="email" placeholder="Correo electrónico" autocomplete="email">
+    </div>
+    <div class="error-msg" id="err-email"></div>
+
+    <!-- CONTRASEÑA: wrapper externo para posicionar el ojo -->
+    <div class="password-wrapper">
+      <div class="input-group">
+        <i class="ri-lock-line"></i>
+        <input id="password" type="password" placeholder="Contraseña" autocomplete="current-password">
+      </div>
+      <button type="button" class="toggle-pass" id="togglePass" tabindex="-1">
+        <i class="ri-eye-off-line" id="eyeIcon"></i>
+      </button>
+    </div>
+    <div class="error-msg" id="err-password"></div>
+
+    <button type="submit" class="btn-login" id="btnLogin" style="margin-top:18px">
+      <span id="btnText">ACCEDER</span>
+    </button>
+
+  </form>
+</div>
+
+<script>
+  let roleSeleccionado = null;
+  const API_URL = 'http://localhost:3000/api';
+
+  const params = new URLSearchParams(window.location.search);
+  const msgParam = params.get('msg');
+  if (msgParam) {
+    const box = document.getElementById('sessionMsg');
+    document.getElementById('sessionMsgText').textContent = msgParam;
+    box.classList.add('show');
+  }
+
+  (function verificarSesionExistente() {
+    const token   = sessionStorage.getItem('kika_token');
+    const usuario = JSON.parse(sessionStorage.getItem('kika_usuario') || 'null');
+    if (!token || !usuario) return;
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      if (!payload.exp || Date.now() / 1000 < payload.exp) {
+        window.location.href = 'pages/shells/Interfas_Admin.html';
+      }
+    } catch { /* token inválido */ }
+  })();
+
+  function selRole(btn) {
+    document.querySelectorAll('.role-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    roleSeleccionado = btn.dataset.role;
+    document.getElementById('loginErr').textContent = '';
+  }
+
+  document.getElementById('togglePass').addEventListener('click', function () {
+    const input = document.getElementById('password');
+    const icon  = document.getElementById('eyeIcon');
+    if (input.type === 'password') {
+      input.type     = 'text';
+      icon.className = 'ri-eye-line';
+    } else {
+      input.type     = 'password';
+      icon.className = 'ri-eye-off-line';
+    }
+  });
+
+  ['email', 'password'].forEach(id => {
+    document.getElementById(id).addEventListener('input', () => {
+      document.getElementById(`err-${id}`).textContent = '';
+      document.getElementById('loginErr').textContent  = '';
+    });
+  });
+
+  document.getElementById('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const email    = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    let valid = true;
+
+    if (!roleSeleccionado) {
+      document.getElementById('loginErr').textContent = 'Selecciona un perfil para continuar';
+      return;
+    }
+    if (!email) {
+      mostrarError('err-email', 'Ingresa tu correo electrónico'); valid = false;
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      mostrarError('err-email', 'Correo electrónico no válido'); valid = false;
+    }
+    if (!password) {
+      mostrarError('err-password', 'Ingresa tu contraseña'); valid = false;
+    }
+    if (!valid) return;
+
+    const btn  = document.getElementById('btnLogin');
+    const text = document.getElementById('btnText');
+    btn.disabled     = true;
+    text.textContent = 'Verificando...';
+
+    try {
+      const res = await fetch(`${API_URL}/auth/login`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ Email: email, Password: password, ROL_idROL: roleSeleccionado })
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        document.getElementById('loginErr').textContent = data.message || 'Error al iniciar sesión';
+        return;
+      }
+
+      sessionStorage.setItem('kika_token',   data.token);
+      sessionStorage.setItem('kika_usuario', JSON.stringify(data.usuario));
+      sessionStorage.setItem('kika_rol',     data.usuario.ROL_idROL);
+
+      window.location.href = 'pages/shells/Interfas_Admin.html';
+
+    } catch {
+      document.getElementById('loginErr').textContent = 'No se pudo conectar al servidor. Intenta de nuevo.';
+    } finally {
+      btn.disabled     = false;
+      text.textContent = 'ACCEDER';
+    }
+  });
+
+  function mostrarError(id, msg) {
+    const el = document.getElementById(id);
+    el.textContent = msg;
+    el.classList.add('show');
+  }
+</script>
+</body>
+</html>

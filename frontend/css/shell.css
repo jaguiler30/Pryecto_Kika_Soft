@@ -1,0 +1,107 @@
+/* ============================================================
+   shell.css — Estilos del shell principal (Interfas_Admin)
+   Ubicación: frontend/css/shell.css
+   ============================================================ */
+
+body.page-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.navbar {
+  height: auto;
+  min-height: 56px;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  z-index: 100;
+}
+
+/* ── TOPNAV ── */
+.topnav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  padding: 0 8px;
+}
+
+.tn-group { position: relative; }
+
+.tn-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: transparent;
+  border: none;
+  color: rgba(255,255,255,.8);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: .2s ease;
+  white-space: nowrap;
+}
+.tn-btn:hover,
+.tn-btn.active { background: rgba(255,255,255,.15); color: #fff; }
+.tn-btn i { font-size: 15px; }
+
+.tn-dropdown {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  background: #fff;
+  border: 1px solid #e2e5ea;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(14,27,37,.18);
+  min-width: 210px;
+  z-index: 500;
+  overflow: hidden;
+  animation: dropIn .15s ease;
+}
+
+@keyframes dropIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.tn-group:hover .tn-dropdown { display: block; }
+
+.tn-dropdown a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  color: #0e1b25;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 500;
+  transition: .2s ease;
+}
+.tn-dropdown a:hover,
+.tn-dropdown a.active { background: #e6f4f7; color: #1a6b7c; }
+.tn-dropdown a i { font-size: 15px; color: #1a6b7c; }
+
+/* ── CONTENIDO FULL WIDTH ── */
+.content-full {
+  flex: 1;
+  min-height: 0;               /* crítico: permite que flex-child se encoja correctamente */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.content-full iframe {
+  width: 100%;
+  flex: 1;
+  min-height: 0;               /* crítico: sin esto el iframe ignora el límite del padre */
+  border: none;
+  display: block;
+  overflow: auto;              /* habilita scroll dentro del iframe */
+}

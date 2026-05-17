@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Soporte Técnico</title>
+  <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../../css/kika.css">
+</head>
+<body class="page-support">
+
+<div class="support-card">
+
+  <div class="support-card-header">
+    <h2><i class="ri-customer-service-2-line"></i> Soporte Técnico</h2>
+    <p>Mis tickets reportados</p>
+  </div>
+
+  <div class="support-card-body">
+
+    <!-- Lista de tickets del usuario actual -->
+    <div id="estadoCarga" style="text-align:center;padding:20px;font-size:13px;color:var(--text-sec)">
+      <i class="ri-loader-4-line"></i> Cargando tickets...
+    </div>
+    <div id="listaTickets" style="display:none"></div>
+
+    <!-- Formulario para crear un nuevo ticket -->
+    <div class="ticket-form">
+      <h3><i class="ri-add-circle-line"></i> Reportar nuevo problema</h3>
+      <form id="frmTicket" novalidate>
+
+        <div style="margin-bottom:12px">
+          <div class="field-label">Módulo afectado</div>
+          <select class="field-input" id="modulo">
+            <option value="" disabled selected>Seleccionar módulo</option>
+            <option>Login / Acceso</option>
+            <option>Gestión de usuarios</option>
+            <option>Materia Prima / Insumos</option>
+            <option>Colección</option>
+            <option>Prendas</option>
+            <option>Costeo</option>
+            <option>Consultas</option>
+            <option>Otro</option>
+          </select>
+        </div>
+
+        <div style="margin-bottom:12px">
+          <div class="field-label">Descripción del problema *</div>
+          <textarea class="field-input" id="descripcion" rows="3"
+            placeholder="Describe con detalle el problema..."></textarea>
+          <div class="field-error" id="err-descripcion"></div>
+        </div>
+
+        <div class="form-actions" style="border-top:none;padding-top:0;margin-top:0">
+          <button type="submit" class="btn btn-secondary">
+            <i class="ri-send-plane-line"></i> Enviar reporte
+          </button>
+        </div>
+
+      </form>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+<script src="../../js/kika.js"></script>
+<script>
+  /* Guard: cualquier rol autenticado puede reportar tickets */
+  requireAuth();
+
+  /* ── Carga los tickets del usuario desde la API ── */
+  async function cargarTickets() {
+    try {
+      const res = await fetch(`${API_URL}/soporte/mis-tickets`, {
+        headers: { 'Authorization': `Bearer ${getToken()}` }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      renderTickets(data.data || []);
+    } catch {
+      // Si la API aún no existe, mostrar lista vacía sin error visible
+      renderTickets([]);
+    }
+  }
+
+  /* ── Renderiza la lista de tickets ─────────── */
+  function renderTickets(tickets) {
+    const lista = document.getElementById('listaTickets');
+    lista.innerHTML = '';
+
+    if (!tickets.length) {
+      lista.innerHTML = '<p style="text-align:center;color:var(--text-sec);font-size:13px;padding:12px 0">No tienes tickets reportados aún.</p>';
+    } else {
+      tickets.forEach(t => {
+        const div = document.createElement('div');
+        div.className = 'ticket';
+        div.innerHTML = `
+          <div class="ticket-meta">
+            <span class="user"><i class="ri-user-line"></i> ${t.usuario || 'Tú'}</span>
+            <span>${t.fecha || ''}</span>
+          </div>
+          <p>${t.descripcion}</p>
+          <span class="badge badge-${t.estado === 'resuelto' ? 'resolved' : 'pending'}">
+            ${t.estado === 'resuelto' ? 'Resuelto' : 'Pendiente'}
+          </span>`;
+        lista.appendChild(div);
+      });
+    }
+
+    document.getElementById('estadoCarga').style.display = 'none';
+    lista.style.display = 'block';
+  }
+
+  /* ── Envía un nuevo ticket ──────────────────── */
+  document.getElementById('frmTicket').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const desc    = document.getElementById('descripcion');
+    const errEl   = document.getElementById('err-descripcion');
+    const modulo  = document.getElementById('modulo').value || 'Sin especificar';
+
+    // Validación
+    if (!desc.value.trim()) {
+      desc.classList.add('error');
+      errEl.textContent = 'Describe el problema';
+      errEl.style.display = 'block';
+      return;
+    }
+    desc.classList.remove('error');
+    errEl.style.display = 'none';
+
+    try {
+      const res = await fetch(`${API_URL}/soporte`, {
+        method:  'POST',
+        headers: {
+          'Content-Type':  'application/json',
+          'Authorization': `Bearer ${getToken()}`
+        },
+        body: JSON.stringify({ modulo, descripcion: desc.value.trim() })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+
+      toast('Reporte enviado correctamente', 'success');
+      e.target.reset();
+      await cargarTickets(); // Refrescar la lista con el nuevo ticket
+
+    } catch (err) {
+      toast('Error al enviar: ' + err.message, 'error');
+    }
+  });
+
+  /* Cargar al abrir la página */
+  cargarTickets();
+</script>
+</body>
+</html>

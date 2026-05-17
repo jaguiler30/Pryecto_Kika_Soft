@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<!--
+  Costeo.html — Módulo de Costeo Textil PF-FW 2026
+  Se carga dentro del iframe de Interfas_Admin.html
+  NO tiene login propio: toma token y rol del shell padre (window.parent)
+  Roles permitidos: 4 (Admin), 1 (Materia Prima), 2 (Costeo)
+-->
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>KV · Costeo Textil</title>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../../css/kika.css">
+  <link rel="stylesheet" href="../../css/costeo.css">
+<style>
+  #topbar { display: none !important; }
+
+  html, body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: auto;
+  }
+
+  #content {
+    height: auto;
+    overflow: visible;
+    min-width: max-content;
+  }
+
+  .pane {
+    height: auto;
+    overflow: visible;
+    min-width: max-content;
+  }
+</style>
+</head>
+<body>
+<!-- ── TOPBAR INTERNO del módulo ──────────────────────────── -->
+<div id="topbar">
+  <div class="brand">KV</div>
+  <div class="subtitle">Costeo Textil · PF-FW 2026</div>
+  <div class="spacer"></div>
+  <div class="top-trm" id="trm-box" style="display:none">
+    TRM $<input id="g-trm" type="number" value="3700" onchange="onTrmChange(this.value)"> COP/USD
+  </div>
+  <div class="user-chip" id="user-chip">
+    <div class="role-dot" id="role-dot"></div>
+    <span id="user-label"></span>
+  </div>
+  <button class="top-btn amber" id="btn-demo" onclick="loadDemo()" style="display:none">▶ Cargar Demo</button>
+  <button class="top-btn" id="btn-csv" onclick="exportCSV()" style="display:none">⬇ CSV</button>
+</div>
+
+<!-- ── TABS ──────────────────────────────────────────────── -->
+<div id="tabstrip"></div>
+
+<!-- ── CONTENIDO ─────────────────────────────────────────── -->
+<div id="content"></div>
+
+<!-- ── MODAL: Insumos Fijos ──────────────────────────────── -->
+<div id="fijos-modal" class="modal-bg" style="display:none">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>⚙ Insumos Fijos — Aplican a TODAS las referencias</h3>
+      <button class="btn-del" onclick="closeFijosModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:11px;color:var(--tx3);margin-bottom:10px">
+        Se suman automáticamente a cada prenda. Cambia precio o cantidad → el consolidado se recalcula.
+      </p>
+      <table class="xgrid" style="width:100%">
+        <thead><tr>
+          <th>Insumo Fijo</th>
+          <th class="num">Precio/Unid</th>
+          <th class="num">Cantidad</th>
+          <th class="num ttl">TTL/Prenda</th>
+          <th style="width:28px"></th>
+        </tr></thead>
+        <tbody id="fijos-body"></tbody>
+        <tfoot><tr>
+          <td colspan="3" style="text-align:right;padding:6px 8px;font-weight:700;font-size:11px">TOTAL FIJOS/PRENDA</td>
+          <td class="ttl num" style="padding:4px 8px;font-family:var(--mono);font-weight:700" id="fijos-total-modal">$ 0</td>
+          <td></td>
+        </tr></tfoot>
+      </table>
+      <div style="margin-top:10px;display:flex;gap:8px">
+        <button class="btn btn-o btn-sm" onclick="addFijoRow()">+ Agregar</button>
+        <button class="btn btn-o btn-sm" onclick="seedFijos()">Cargar defaults Excel</button>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-g" onclick="closeFijosModal()">Aplicar y cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL: Colección ───────────────────────────────────── -->
+<div id="col-modal" class="modal-bg" style="display:none">
+  <div class="modal" style="width:480px">
+    <div class="modal-head">
+      <h3 id="col-modal-title">Nueva Colección</h3>
+      <button class="btn-del" onclick="closeColModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div class="fg">
+          <label>Nombre colección</label>
+          <input id="cm-name" placeholder="PRE-FALL 26" style="width:100%">
+        </div>
+        <div style="display:flex;gap:10px">
+          <div class="fg" style="flex:1">
+            <label>Temporada</label>
+            <select id="cm-season">
+              <option>PF</option><option>FW</option>
+              <option>SS</option><option>RT</option>
+            </select>
+          </div>
+          <div class="fg" style="flex:1">
+            <label>Año</label>
+            <input id="cm-year" type="number" value="2026">
+          </div>
+        </div>
+        <div class="fg">
+          <label>Descripción</label>
+          <input id="cm-desc" placeholder="Descripción opcional…" style="width:100%">
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-o" onclick="closeColModal()">Cancelar</button>
+      <button class="btn btn-g" onclick="saveCollection()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── TOAST ──────────────────────────────────────────────── -->
+<div id="toast"></div>
+
+<!-- ── SCRIPTS (orden obligatorio) ───────────────────────── -->
+<script src="../../js/utils.js"></script>
+<script src="../../js/state.js"></script>
+<script src="../../js/calculator.js"></script>
+<script src="../../js/auth.js"></script>
+<script src="../../js/pane-colecciones.js"></script>
+<script src="../../js/pane-telas.js"></script>
+<script src="../../js/pane-insumos.js"></script>
+<script src="../../js/pane-consolidado.js"></script>
+<script src="../../js/pane-canales.js"></script>
+<script src="../../js/pane-consulta.js"></script>
+<script src="../../js/pane-historial.js"></script>
+<script src="../../js/demo.js"></script>
+<script src="../../js/app.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<script>
+  (function initFromKika() {
+  
+    const parent   = window.parent;
+    const token    = parent?.kikaToken    || sessionStorage.getItem('kika_token');
+    const usuario  = parent?.kikaUsuario  || JSON.parse(sessionStorage.getItem('kika_usuario') || 'null');
+    const rolKika  = parseInt(parent?.kikaRol) || parseInt(sessionStorage.getItem('kika_rol') || '0');
+  
+    if (!token || !usuario) {
+      document.body.innerHTML = `
+        <div style="display:flex;flex-direction:column;align-items:center;
+                    justify-content:center;height:100vh;gap:16px;
+                    font-family:'DM Sans',sans-serif;color:#5C574F;background:#EFECE4">
+          <div style="font-size:48px">🔒</div>
+          <div style="font-size:16px;font-weight:700;color:#1A1714">Sesión no encontrada</div>
+          <div style="font-size:13px">Inicia sesión desde el panel principal de Kika.</div>
+        </div>`;
+      return;
+    }
+  
+    const ROL_MAP   = { 4: 'admin', 1: 'materia_prima', 2: 'finanzas' };
+    const rolCosteo = ROL_MAP[rolKika];
+  
+    if (!rolCosteo) {
+      document.body.innerHTML = `
+        <div style="display:flex;flex-direction:column;align-items:center;
+                    justify-content:center;height:100vh;gap:16px;
+                    font-family:'DM Sans',sans-serif;color:#5C574F;background:#EFECE4">
+          <div style="font-size:48px">⛔</div>
+          <div style="font-size:16px;font-weight:700;color:#1A1714">Acceso no autorizado</div>
+          <div style="font-size:13px">
+            El módulo de Costeo está disponible para:<br>
+            <b>Administrador · Materia Prima · Costeo</b>
+          </div>
+        </div>`;
+      return;
+    }
+  
+    currentUser = {
+      name:  usuario.Nombre,
+      role:  rolCosteo,
+      token: token,
+    };
+  
+    buildUI();
+  
+    addHist('Accedió al módulo de Costeo', 'Login',
+      `${usuario.Nombre} (Rol Kika: ${rolKika})`);
+  
+  })();
+
+  // Leer tab inicial desde la URL si viene desde la barra superior
+const tabParam = new URLSearchParams(window.location.search).get('tab');
+if (tabParam) {
+  const btn = document.getElementById('tab-' + tabParam);
+  if (btn) goTab(tabParam, btn);
+}
+  </script>
+
+</body>
+</html>

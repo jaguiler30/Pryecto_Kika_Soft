@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestión de Soporte</title>
+  <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+  <link rel="stylesheet" href="../../css/kika.css">
+  <style>
+    .ticket-card {
+      background: var(--white);
+      border: 1.5px solid var(--gray-mid);
+      border-radius: 12px;
+      padding: 16px 18px;
+      margin-bottom: 10px;
+      transition: var(--tr);
+    }
+    .ticket-card:hover { border-color: var(--teal); box-shadow: 0 2px 12px rgba(26,107,124,.08); }
+    .ticket-header {
+      display: flex; align-items: flex-start;
+      justify-content: space-between; gap: 12px; margin-bottom: 8px;
+    }
+    .ticket-asunto { font-weight: 700; font-size: 14px; color: var(--navy); }
+    .ticket-meta   { font-size: 11px; color: var(--text-sec); margin-top: 2px; line-height: 1.8; }
+    .ticket-desc   { font-size: 13px; color: var(--text); margin: 8px 0 12px; line-height: 1.6; }
+    .ticket-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+
+    /* Badges de prioridad */
+    .badge { display: inline-flex; align-items: center; gap: 4px;
+             padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+    .badge-alta    { background: #ffeaea; color: var(--red); }
+    .badge-media   { background: #fff8e1; color: #c87e00; }
+    .badge-baja    { background: var(--teal-bg); color: var(--teal); }
+
+    /* Badges de estado */
+    .badge-pendiente   { background: #fff8e1; color: #c87e00; }
+    .badge-en-proceso  { background: #e6f4f7; color: var(--teal); }
+    .badge-resuelto    { background: #eafaf1; color: var(--green); }
+
+    /* Select de estado */
+    .estado-select {
+      height: 34px; padding: 0 10px; border: 1.5px solid var(--gray-mid);
+      border-radius: 8px; font-family: 'DM Sans', sans-serif;
+      font-size: 12px; font-weight: 600; color: var(--text);
+      background: var(--gray-lt); cursor: pointer; transition: var(--tr);
+    }
+    .estado-select:focus { outline: none; border-color: var(--teal); }
+
+    .btn-resolver {
+      height: 34px; padding: 0 14px; border: none; border-radius: 8px;
+      background: var(--teal); color: white; font-family: 'DM Sans', sans-serif;
+      font-size: 12px; font-weight: 700; cursor: pointer; transition: var(--tr);
+      display: flex; align-items: center; gap: 6px;
+    }
+    .btn-resolver:hover { background: var(--teal-lt); }
+    .btn-resolver:disabled { opacity: .5; cursor: not-allowed; }
+
+    .empty-state {
+      text-align: center; padding: 48px 20px;
+      color: var(--text-sec); font-size: 13px;
+    }
+    .empty-state i { font-size: 40px; display: block; margin-bottom: 12px; color: var(--gray-mid); }
+
+    .filtros { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+    .filtro-btn {
+      padding: 6px 14px; border: 1.5px solid var(--gray-mid); border-radius: 20px;
+      background: var(--gray-lt); font-family: 'DM Sans', sans-serif;
+      font-size: 12px; font-weight: 600; color: var(--text-sec); cursor: pointer; transition: var(--tr);
+    }
+    .filtro-btn:hover, .filtro-btn.active {
+      border-color: var(--teal); background: var(--teal); color: white;
+    }
+
+    .contador {
+      font-size: 11px; color: var(--text-sec); margin-bottom: 12px;
+    }
+    .contador strong { color: var(--navy); }
+  </style>
+</head>
+<body class="page-form">
+
+<div class="form-card" style="max-width:720px">
+  <div class="form-card-header">
+    <h2><i class="ri-customer-service-2-line"></i> Solicitudes de Soporte</h2>
+    <button class="btn btn-secondary" style="padding:6px 14px;font-size:12px" onclick="cargarTickets()">
+      <i class="ri-refresh-line"></i> Actualizar
+    </button>
+  </div>
+
+  <div class="form-card-body">
+
+    <!-- Filtros -->
+    <div class="filtros">
+      <button class="filtro-btn active" onclick="filtrar('Todos', this)">Todos</button>
+      <button class="filtro-btn" onclick="filtrar('Pendiente', this)">
+        <i class="ri-time-line"></i> Pendientes
+      </button>
+      <button class="filtro-btn" onclick="filtrar('En proceso', this)">
+        <i class="ri-loader-2-line"></i> En proceso
+      </button>
+    </div>
+
+    <!-- Contador -->
+    <div class="contador" id="contador"></div>
+
+    <!-- Estado de carga -->
+    <div id="estadoCarga" style="text-align:center;padding:30px;font-size:13px;color:var(--text-sec)">
+      <i class="ri-loader-4-line"></i> Cargando solicitudes...
+    </div>
+
+    <!-- Lista de tickets -->
+    <div id="listaTickets"></div>
+
+  </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+<script src="../../js/kika.js"></script>
+<script>
+  const API_URL = 'http://localhost:3000/api';
+  let todosLosTickets = [];
+  let filtroActivo    = 'Todos';
+
+  function getToken() {
+    return window.parent?.kikaToken || sessionStorage.getItem('kika_token');
+  }
+
+  // ── Cargar todos los tickets ───────────────────────────
+  async function cargarTickets() {
+    document.getElementById('estadoCarga').style.display = 'block';
+    document.getElementById('listaTickets').innerHTML    = '';
+    document.getElementById('contador').textContent      = '';
+
+    try {
+      const res  = await fetch(`${API_URL}/soporte`, {
+        headers: { 'Authorization': `Bearer ${getToken()}` }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+
+      todosLosTickets = data.data;
+      aplicarFiltro();
+
+    } catch (err) {
+      document.getElementById('estadoCarga').innerHTML =
+        `<i class="ri-error-warning-line"></i> Error al cargar: ${err.message}`;
+    }
+  }
+
+  // ── Filtrar tickets ─────────────────────────────────────
+  function filtrar(estado, btn) {
+    filtroActivo = estado;
+    document.querySelectorAll('.filtro-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    aplicarFiltro();
+  }
+
+  function aplicarFiltro() {
+    const filtrados = filtroActivo === 'Todos'
+      ? todosLosTickets
+      : todosLosTickets.filter(t => t.estado === filtroActivo);
+    renderizar(filtrados);
+  }
+
+  // ── Renderizar tickets ──────────────────────────────────
+  function renderizar(tickets) {
+    const lista = document.getElementById('listaTickets');
+    lista.innerHTML = '';
+    document.getElementById('estadoCarga').style.display = 'none';
+
+    const total = todosLosTickets.length;
+    const pend  = todosLosTickets.filter(t => t.estado === 'Pendiente').length;
+    document.getElementById('contador').innerHTML =
+      `<strong>${total}</strong> solicitudes en total · <strong>${pend}</strong> pendientes`;
+
+    if (tickets.length === 0) {
+      lista.innerHTML = `
+        <div class="empty-state">
+          <i class="ri-checkbox-circle-line" style="color:var(--teal)"></i>
+          No hay solicitudes ${filtroActivo !== 'Todos' ? 'con estado "' + filtroActivo + '"' : ''}
+        </div>`;
+      return;
+    }
+
+    tickets.forEach(t => {
+      const badgePrioridad = {
+        Alta:  'badge-alta',
+        Media: 'badge-media',
+        Baja:  'badge-baja',
+      }[t.prioridad] || 'badge-media';
+
+      const badgeEstado = {
+        'Pendiente':  'badge-pendiente',
+        'En proceso': 'badge-en-proceso',
+        'Resuelto':   'badge-resuelto',
+      }[t.estado] || 'badge-pendiente';
+
+      const fecha = t.fecha_creacion
+        ? new Date(t.fecha_creacion).toLocaleDateString('es-CO', {
+            day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+          })
+        : '—';
+
+      const div = document.createElement('div');
+      div.className = 'ticket-card';
+      div.id = `ticket-${t.idSOPORTE}`;
+      div.innerHTML = `
+        <div class="ticket-header">
+          <div>
+            <div class="ticket-asunto">${t.asunto}</div>
+            <div class="ticket-meta">
+              <i class="ri-user-line"></i> ${t.NombreUsuario} &nbsp;·&nbsp;
+              <i class="ri-mail-line"></i> ${t.EmailUsuario} &nbsp;·&nbsp;
+              <i class="ri-time-line"></i> ${fecha}
+            </div>
+          </div>
+          <div style="display:flex;gap:6px;flex-shrink:0">
+            <span class="badge ${badgePrioridad}">● ${t.prioridad}</span>
+            <span class="badge ${badgeEstado}" id="badge-estado-${t.idSOPORTE}">${t.estado}</span>
+          </div>
+        </div>
+        <div class="ticket-desc">${t.descripcion}</div>
+        <div class="ticket-footer">
+          <select class="estado-select" id="sel-${t.idSOPORTE}"
+            onchange="actualizarBtnResolver(${t.idSOPORTE})">
+            <option value="Pendiente"   ${t.estado === 'Pendiente'   ? 'selected' : ''}>⏳ Pendiente</option>
+            <option value="En proceso"  ${t.estado === 'En proceso'  ? 'selected' : ''}>🔄 En proceso</option>
+            <option value="Resuelto"    ${t.estado === 'Resuelto'    ? 'selected' : ''}>✅ Resuelto</option>
+          </select>
+          <button class="btn-resolver" id="btn-${t.idSOPORTE}"
+            onclick="cambiarEstado(${t.idSOPORTE})">
+            <i class="ri-save-line"></i> Guardar
+          </button>
+        </div>
+      `;
+      lista.appendChild(div);
+    });
+  }
+
+  // ── Cambiar estado ──────────────────────────────────────
+  async function cambiarEstado(id) {
+    const estado = document.getElementById(`sel-${id}`).value;
+    const btn    = document.getElementById(`btn-${id}`);
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="ri-loader-4-line"></i> Guardando...';
+
+    try {
+      const res  = await fetch(`${API_URL}/soporte/${id}/estado`, {
+        method:  'PUT',
+        headers: {
+          'Content-Type':  'application/json',
+          'Authorization': `Bearer ${getToken()}`
+        },
+        body: JSON.stringify({ estado })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+
+      toast(data.message, estado === 'Resuelto' ? 'success' : 'info');
+
+      // Si se resolvió → eliminar la tarjeta de la lista
+      if (estado === 'Resuelto') {
+        const card = document.getElementById(`ticket-${id}`);
+        card.style.transition = 'opacity .3s';
+        card.style.opacity    = '0';
+        setTimeout(() => {
+          card.remove();
+          // Actualizar contador
+          todosLosTickets = todosLosTickets.filter(t => t.idSOPORTE !== id);
+          const pend = todosLosTickets.filter(t => t.estado === 'Pendiente').length;
+          document.getElementById('contador').innerHTML =
+            `<strong>${todosLosTickets.length}</strong> solicitudes en total · <strong>${pend}</strong> pendientes`;
+        }, 300);
+      } else {
+        // Actualizar badge de estado visualmente
+        const badge = document.getElementById(`badge-estado-${id}`);
+        badge.textContent = estado;
+        badge.className   = `badge ${{
+          'Pendiente':  'badge-pendiente',
+          'En proceso': 'badge-en-proceso',
+        }[estado]}`;
+        btn.disabled  = false;
+        btn.innerHTML = '<i class="ri-save-line"></i> Guardar';
+        // Actualizar en el array local
+        const t = todosLosTickets.find(t => t.idSOPORTE === id);
+        if (t) t.estado = estado;
+      }
+
+    } catch (err) {
+      toast('Error: ' + err.message, 'error');
+      btn.disabled  = false;
+      btn.innerHTML = '<i class="ri-save-line"></i> Guardar';
+    }
+  }
+
+  function actualizarBtnResolver(id) {
+    const estado = document.getElementById(`sel-${id}`).value;
+    const btn    = document.getElementById(`btn-${id}`);
+    if (estado === 'Resuelto') {
+      btn.style.background = 'var(--green)';
+      btn.innerHTML = '<i class="ri-check-line"></i> Marcar resuelto';
+    } else {
+      btn.style.background = '';
+      btn.innerHTML = '<i class="ri-save-line"></i> Guardar';
+    }
+  }
+
+  // Cargar al inicio
+  cargarTickets();
+</script>
+</body>
+</html>

@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Eliminar Usuario</title>
+  <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../../css/kika.css">
+</head>
+<body class="page-user-form">
+
+<div class="user-card" style="max-width:520px">
+  <div class="user-card-header" style="background:var(--red)">
+    <i class="ri-user-unfollow-line" style="font-size:18px"></i>
+    Eliminar Usuario
+  </div>
+  <div class="user-card-body">
+
+    <!-- Advertencia visual -->
+    <div style="background:#fff0f0;border:1px solid #f5c6c6;border-radius:8px;
+                padding:12px;margin-bottom:18px;font-size:12px;color:var(--red);line-height:1.6">
+      <i class="ri-error-warning-line"></i>
+      <strong>Atención:</strong> esta acción es irreversible. El usuario perderá acceso
+      inmediatamente.
+    </div>
+
+    <!-- Buscador -->
+    <div style="margin-bottom:16px">
+      <div class="field-label">Buscar usuario</div>
+      <div style="display:flex;gap:8px">
+        <input class="field-input" id="buscar" type="text"
+               placeholder="Nombre o correo" style="flex:1" oninput="filtrar()">
+        <button type="button" class="btn btn-cancel" style="height:40px;padding:0 14px"
+                onclick="cargarUsuarios()" title="Recargar lista">
+          <i class="ri-refresh-line"></i>
+        </button>
+      </div>
+    </div>
+
+    <div id="estadoCarga" style="text-align:center;padding:24px;font-size:13px;color:var(--text-sec)">
+      <i class="ri-loader-4-line"></i> Cargando usuarios...
+    </div>
+
+    <div id="listaUsuarios" style="display:none"></div>
+
+  </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+<script src="../../js/kika.js"></script>
+<script>
+  /* Guard: solo administradores */
+  requireAuth([4]);
+
+  /** Caché local para filtrado sin llamadas extra */
+  let todosLosUsuarios = [];
+
+  /* ── Carga usuarios desde la API ─────────── */
+  async function cargarUsuarios() {
+    document.getElementById('estadoCarga').style.display = 'block';
+    document.getElementById('estadoCarga').innerHTML = '<i class="ri-loader-4-line"></i> Cargando...';
+    document.getElementById('listaUsuarios').style.display = 'none';
+
+    try {
+      const res = await fetch(`${API_URL}/usuarios`, {
+        headers: { 'Authorization': `Bearer ${getToken()}` }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+
+      todosLosUsuarios = data.data;
+      renderizar(todosLosUsuarios);
+
+    } catch (err) {
+      document.getElementById('estadoCarga').innerHTML =
+        `<i class="ri-error-warning-line" style="color:var(--red)"></i> Error: ${err.message}`;
+    }
+  }
+
+  /* ── Renderiza el listado ────────────────────
+     El usuario logueado no puede eliminarse a sí mismo */
+  function renderizar(usuarios) {
+    const lista   = document.getElementById('listaUsuarios');
+    const yo      = window.parent?.kikaUsuario || JSON.parse(sessionStorage.getItem('kika_usuario') || 'null');
+    lista.innerHTML = '';
+
+    if (!usuarios.length) {
+      lista.innerHTML = '<p style="text-align:center;color:var(--text-sec);font-size:13px;padding:16px">No se encontraron usuarios</p>';
+    } else {
+      usuarios.forEach(u => {
+        const esSelf = yo && u.idUSUARIO === yo.idUSUARIO;
+        const div = document.createElement('div');
+        div.className = 'ticket';
+        div.style.cssText = `display:flex;align-items:center;justify-content:space-between;
+          gap:12px;margin-bottom:8px;${esSelf ? 'opacity:.45' : ''}`;
+
+        div.innerHTML = `
+          <div style="flex:1;min-width:0">
+            <div style="font-weight:700;font-size:13px">
+              ${u.Nombre}
+              ${esSelf ? '<span style="font-size:10px;color:var(--text-sec)"> (tú)</span>' : ''}
+            </div>
+            <div style="font-size:11px;color:var(--text-sec);margin-top:1px">
+              ${u.Email} · ${ROLES[u.ROL_idROL] || '—'}
+            </div>
+            <div style="font-size:11px;font-weight:600;margin-top:3px;
+              color:${u.Activo ? 'var(--teal)' : 'var(--red)'}">
+              ${u.Activo ? '● Activo' : '● Bloqueado'}
+            </div>
+          </div>
+          <button class="btn btn-danger" style="padding:6px 14px;font-size:12px;flex-shrink:0"
+            ${esSelf ? 'disabled title="No puedes eliminarte a ti mismo"' : ''}
+            onclick="eliminar(${u.idUSUARIO}, '${u.Nombre.replace(/'/g,"\\'")}', this)">
+            <i class="ri-delete-bin-line"></i> Eliminar
+          </button>`;
+
+        lista.appendChild(div);
+      });
+    }
+
+    document.getElementById('estadoCarga').style.display = 'none';
+    lista.style.display = 'block';
+  }
+
+  /* ── Filtra localmente sin llamar al backend ── */
+  function filtrar() {
+    const val = document.getElementById('buscar').value.trim().toLowerCase();
+    renderizar(!val
+      ? todosLosUsuarios
+      : todosLosUsuarios.filter(u =>
+          u.Nombre.toLowerCase().includes(val) ||
+          u.Email.toLowerCase().includes(val)
+        )
+    );
+  }
+
+  /* ── Elimina un usuario tras confirmar con modal ──
+     Usa confirmar() de kika.js, no confirm() nativo  */
+  async function eliminar(id, nombre, btn) {
+    const ok = await confirmar(
+      `¿Eliminar al usuario <strong>${nombre}</strong>? Esta acción no se puede deshacer.`,
+      'danger',
+      'Eliminar'
+    );
+    if (!ok) return;
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="ri-loader-4-line"></i>';
+
+    try {
+      const res = await fetch(`${API_URL}/usuarios/${id}`, {
+        method:  'DELETE',
+        headers: { 'Authorization': `Bearer ${getToken()}` }
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+
+      toast(`Usuario "${nombre}" eliminado`, 'error');
+      await cargarUsuarios();
+
+    } catch (err) {
+      toast('Error: ' + err.message, 'error');
+      btn.disabled = false;
+      btn.innerHTML = '<i class="ri-delete-bin-line"></i> Eliminar';
+    }
+  }
+
+  /* Cargar al abrir la página */
+  cargarUsuarios();
+</script>
+</body>
+</html>

@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Kika — Panel</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../../css/kika.css">
+  <link rel="stylesheet" href="../../css/shell.css">
+</head>
+
+<body class="page-shell">
+
+  <!-- NAVBAR -->
+  <div class="navbar">
+    <img src="../../img/LOGO BLANCO.png" alt="Kika" class="logo"
+         onerror="this.src='../../img/LOGO NEGRO.png'">
+
+    <nav class="topnav">
+
+      <!-- Colecciones: directo, todos -->
+      <div class="tn-group">
+        <button class="tn-btn" onclick="cargar('../producto/producto.html?tab=colecciones',this)">
+          <i class="ri-folder-line"></i> Colecciones
+        </button>
+      </div>
+
+      <!-- Usuarios: solo Admin (rol 4) -->
+      <div class="tn-group" id="secUsuarios" style="display:none">
+        <button class="tn-btn">
+          <i class="ri-user-settings-line"></i> Usuarios
+          <i class="ri-arrow-down-s-line"></i>
+        </button>
+        <div class="tn-dropdown">
+          <a href="#" onclick="cargar('../auth/Creacion_Usuario.html',this)">
+            <i class="ri-user-add-line"></i> Crear Usuario
+          </a>
+          <a href="#" onclick="cargar('../auth/Eliminar_Usuario.html',this)">
+            <i class="ri-user-unfollow-line"></i> Eliminar Usuario
+          </a>
+          <a href="#" onclick="cargar('../auth/Bloquear_Usuario.html',this)">
+            <i class="ri-user-forbid-line"></i> Bloquear / Desbloquear
+          </a>
+        </div>
+      </div>
+
+      <!-- Costeo: roles 4, 1, 2 -->
+      <div class="tn-group" id="secCosteo" style="display:none">
+        <button class="tn-btn">
+          <i class="ri-calculator-line"></i>
+          <span id="labelCosteo">Costeo</span>
+          <i class="ri-arrow-down-s-line"></i>
+        </button>
+        <div class="tn-dropdown" id="dropCosteo"></div>
+      </div>
+
+      <!-- Soporte: todos -->
+      <div class="tn-group">
+        <button class="tn-btn">
+          <i class="ri-customer-service-2-line"></i> Soporte
+          <i class="ri-arrow-down-s-line"></i>
+        </button>
+        <div class="tn-dropdown">
+          <a href="#" onclick="cargar('../soporte/Soporte.html',this)">
+            <i class="ri-tools-line"></i> Soporte Técnico
+          </a>
+          <a href="#" id="liSoporteAdmin" style="display:none"
+             onclick="cargar('../soporte/Soporte_Admin.html',this)">
+            <i class="ri-list-check"></i> Gestión de Tickets
+          </a>
+        </div>
+      </div>
+
+      <!-- Consulta: directo, todos -->
+      <div class="tn-group">
+        <button class="tn-btn" onclick="cargar('../producto/producto.html?tab=consulta',this)">
+          <i class="ri-search-line"></i> Consulta
+        </button>
+      </div>
+
+      <!-- Historial: directo, todos -->
+      <div class="tn-group">
+        <button class="tn-btn" onclick="cargar('../producto/producto.html?tab=historial',this)">
+          <i class="ri-history-line"></i> Historial
+        </button>
+      </div>
+
+    </nav>
+
+    <div class="navbar-right">
+      <div class="user-badge">
+        <i class="ri-user-line"></i>
+        <span id="nombreUsuario">—</span>
+        <span id="rolUsuario" style="opacity:.6;font-size:11px;margin-left:4px"></span>
+      </div>
+      <button class="btn-logout" id="btnSalir">
+        <i class="ri-logout-box-line"></i> Salir
+      </button>
+    </div>
+  </div>
+
+  <!-- CONTENIDO -->
+  <div class="content-full">
+    <iframe id="frame" src="../producto/producto.html?tab=colecciones"></iframe>
+  </div>
+
+  <script src="../../js/kika.js"></script>
+<script>
+  const sesion = requireAuth([1, 2, 3, 4]);
+
+  document.getElementById('nombreUsuario').textContent = sesion.usuario.Nombre;
+  document.getElementById('rolUsuario').textContent    = ROLES[sesion.rol] || '';
+
+  const rol        = sesion.rol;
+  const dropCosteo = document.getElementById('dropCosteo');
+
+  if (rol === 4) {
+    dropCosteo.innerHTML = `
+      <a href="#" onclick="cargar('../producto/producto.html?tab=materia',this)">
+        <i class="ri-ruler-line"></i> Telas & Insumos
+      </a>
+      <a href="#" onclick="cargar('../producto/producto.html?tab=consolidado',this)">
+        <i class="ri-bar-chart-line"></i> Consolidado
+      </a>
+      <a href="#" onclick="cargar('../producto/producto.html?tab=canales',this)">
+        <i class="ri-store-line"></i> Canal de Venta
+      </a>`;
+    document.getElementById('secUsuarios').style.display    = 'flex';
+    document.getElementById('secCosteo').style.display      = 'flex';
+    document.getElementById('liSoporteAdmin').style.display = 'block';
+    document.getElementById('labelCosteo').textContent      = 'Administrador';
+  }
+
+  if (rol === 1) {
+    dropCosteo.innerHTML = `
+      <a href="#" onclick="cargar('../producto/producto.html?tab=materia',this)">
+        <i class="ri-ruler-line"></i> Telas & Insumos
+      </a>`;
+    document.getElementById('secCosteo').style.display = 'flex';
+    document.getElementById('labelCosteo').textContent = 'Materia Prima';
+  }
+
+  if (rol === 2) {
+    dropCosteo.innerHTML = `
+      <a href="#" onclick="cargar('../producto/producto.html?tab=consolidado',this)">
+        <i class="ri-bar-chart-line"></i> Consolidado
+      </a>
+      <a href="#" onclick="cargar('../producto/producto.html?tab=canales',this)">
+        <i class="ri-store-line"></i> Canal de Venta
+      </a>`;
+    document.getElementById('secCosteo').style.display = 'flex';
+    document.getElementById('labelCosteo').textContent = 'Costeo';
+  }
+
+  window.kikaToken   = sesion.token;
+  window.kikaUsuario = sesion.usuario;
+  window.kikaRol     = parseInt(sesion.rol);
+
+  function cargar(pagina, enlace) {
+    document.getElementById('frame').src = pagina;
+    document.querySelectorAll('.tn-dropdown a, .tn-btn')
+      .forEach(a => a.classList.remove('active'));
+    if (enlace) enlace.classList.add('active');
+  }
+
+  document.getElementById('btnSalir').addEventListener('click', async () => {
+    const ok = await confirmar('¿Deseas cerrar la sesión?', 'warning', 'Salir');
+    if (!ok) return;
+    sessionStorage.clear();
+    window.location.href = '../../index.html';
+  });
+</script>
+
+</body>
+</html>
